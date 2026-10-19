@@ -1,0 +1,39 @@
+# Gateway routing config. Contains NO secrets: providers read keys from env vars
+# named in `api_key_env`. Prices are USD per 1M tokens; verify against provider pricing pages.
+providers:
+  - name: openai
+    kind: openai_compatible
+    base_url_env: OPENAI_BASE_URL
+    api_key_env: OPENAI_API_KEY
+  - name: anthropic
+    kind: anthropic
+    api_key_env: ANTHROPIC_API_KEY
+  - name: ollama
+    kind: ollama
+    base_url_env: OLLAMA_BASE_URL
+
+# Callers use aliases; the first entry is primary, the rest are fallbacks in order.
+models:
+  smart:                       # final answers
+    chain:
+      - { provider: anthropic, model: claude-sonnet-5-5, price_in: 0, price_out: 0 }  # fill prices
+      - { provider: openai,    model: gpt-4.1,           price_in: 0, price_out: 0 }
+  extract:                     # deadline extraction, JSON-schema output
+    chain:
+      - { provider: anthropic, model: claude-sonnet-5-5, price_in: 0, price_out: 0 }
+  fast:                        # query rewrite / translation / routing
+    chain:
+      - { provider: anthropic, model: claude-haiku-5-5,  price_in: 0, price_out: 0 }
+      - { provider: ollama,    model: qwen2.5:7b,        price_in: 0, price_out: 0 }
+  embed:
+    chain:
+      - { provider: ollama, model: bge-m3, price_in: 0, price_out: 0 }   # 1024 dims
+
+retry:
+  max_attempts: 3
+  base_delay: 300ms
+  max_delay: 5s
+cache:
+  enabled: true
+  max_entries: 5000
+  ttl: 24h        # only requests with temperature 0 are cached

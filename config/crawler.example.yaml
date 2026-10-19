@@ -1,0 +1,45 @@
+# Crawler scope and seeds. No secrets. Facts below were verified manually on 2026-11-24
+# (see docs/adr/0010-ingestion-design.md).
+user_agent: "UniPDAssistantBot/0.1 (+contact: you@example.com)"   # product token = UniPDAssistantBot
+rate_per_host: 1s          # minimum delay between requests to one host
+max_depth: 3               # link-following depth from HTML seeds (never from PDFs)
+
+hosts:
+  www.unipd.it:
+    robots: honour         # robots.txt: "User-Agent: * / Allow: /", Sitemap: https://www.unipd.it/sitemap.xml
+    sitemaps: ["https://www.unipd.it/sitemap.xml"]
+    # URL discovery = sitemap entries whose path starts with one of these, plus
+    # link-following from seed pages. TODO(M2): extend after reading the sitemap
+    # (admissions, tasse, international students).
+    allowed_path_prefixes:
+      - /borse-studio-alloggi
+  wwwassets.unipd.it:
+    robots: honour         # robots.txt answers 403 => no restrictions (RFC 9309, 4xx); we still send our UA and rate-limit
+    sitemaps: []
+    allowed_path_prefixes:
+      - /sites/default/files/
+    # Served with "x-robots-tag: noindex, nofollow": stored on the version; links are never taken from these files.
+    # PDFs are cached by CloudFront for a year (max-age=31536000) -> use conditional GET (ETag / Last-Modified).
+
+# Corrections are usually published as NEW files (suffixes _0, _1, ...), not replaced in place, so the
+# important signal is a new PDF link on a listing page, not a changed old PDF.
+recrawl:
+  html_listing: 24h        # landing/listing pages: find new files quickly
+  pdf: 168h                # known PDFs: cheap conditional GET
+
+seeds:
+  - url: https://www.unipd.it/borse-studio-alloggi
+    kind: html
+    doc_type: page
+  - url: https://wwwassets.unipd.it/sites/default/files/2026-07/Bando%20Borse%20Studio%202026-27.pdf
+    kind: pdf
+    doc_type: bando
+    language: it
+    academic_year: "2026/27"
+  - url: https://wwwassets.unipd.it/sites/default/files/2026-07/1.Bando%20Borse%20Studio%202026-27_ENG_0.pdf
+    kind: pdf
+    doc_type: bando
+    language: en
+    academic_year: "2026/27"
+    # Indexed for retrieval, but deadlines are extracted from the Italian original only.
+    translation_of: https://wwwassets.unipd.it/sites/default/files/2026-07/Bando%20Borse%20Studio%202026-27.pdf

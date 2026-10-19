@@ -1,0 +1,19 @@
+# STT keyterms (ElevenLabs `keyterms` parameter): domain vocabulary the recogniser should favour.
+# One term per line; '#' starts a comment; blank lines ignored.
+# Validated at voice-service startup against the REALTIME limits (scribe_v3_live), which are the
+# strictest, so switching models later needs no change here:
+#   <= 50 terms, <= 1000 characters in total, each term <= 50 characters and <= 5 words.
+# Keyterms are billed extra by ElevenLabs: keep the list short and useful (ADR-0009).
+ISEE
+ISEU
+CFU
+Uniweb
+Unipd
+bando
+borsa di studio
+immatricolazione
+ESU
+Ateneo
+graduatoria
+idoneo
+fuori sede
