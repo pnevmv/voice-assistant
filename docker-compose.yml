@@ -1,0 +1,80 @@
+# Local development. `make up` starts Postgres only; run services with `make run-<svc>`
+# or start them in containers with `docker compose --profile apps up --build`.
+name: unipd-va
+
+# Variables every app container needs. `environment` beats `env_file`, so these
+# replace the localhost values in .env that are only right outside Docker.
+# A service that needs more writes: environment: { <<: *app-env, EXTRA: value }
+# (never a bare `environment:` block, which would replace this map entirely).
+x-app-env: &app-env
+  DATABASE_URL: postgres://${POSTGRES_USER:-unipd}:${POSTGRES_PASSWORD:-unipd}@postgres:5432/${POSTGRES_DB:-unipd}?sslmode=disable
+  GATEWAY_URL: http://gateway:8081
+  RAG_URL: http://rag:8082
+  OLLAMA_BASE_URL: http://ollama:11434
+  ELEVENLABS_KEYTERMS_FILE: /config/keyterms.txt
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-unipd}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-unipd}
+      POSTGRES_DB: ${POSTGRES_DB:-unipd}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-unipd} -d ${POSTGRES_DB:-unipd}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Local LLM + embeddings (bge-m3). Optional: `docker compose --profile local-llm up -d`.
+  ollama:
+    profiles: ["local-llm"]
+    image: ollama/ollama:latest
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+
+  # Optional local trace UI: `docker compose --profile tracing up -d`, UI on :16686.
+  jaeger:
+    profiles: ["tracing"]
+    image: jaegertracing/all-in-one:latest
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "127.0.0.1:16686:16686"
+      - "127.0.0.1:4317:4317"
+
+  gateway: &app
+    profiles: ["apps"]
+    build: { context: ., args: { SERVICE: gateway } }
+    env_file: .env
+    environment: *app-env
+    depends_on:
+      postgres: { condition: service_healthy }
+    ports: ["127.0.0.1:8081:8081"]
+
+  rag:
+    <<: *app
+    build: { context: ., args: { SERVICE: rag } }
+    ports: ["127.0.0.1:8082:8082"]
+
+  voice:
+    <<: *app
+    build: { context: ., args: { SERVICE: voice } }
+    ports: ["127.0.0.1:8083:8083"]
+
+  crawler:
+    <<: *app
+    build: { context: ., target: runtime-crawler, args: { SERVICE: crawler } }
+    ports: ["127.0.0.1:8084:8084"]
+    volumes:
+      - ./data:/data
+
+volumes:
+  pgdata:
+  ollama:

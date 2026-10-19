@@ -1,0 +1,11 @@
+.env
+bin/
+data/*
+!data/.gitkeep
+*.test
+coverage.out
+# eval
+eval/.venv/
+eval/reports/
+__pycache__/
+.DS_Store
